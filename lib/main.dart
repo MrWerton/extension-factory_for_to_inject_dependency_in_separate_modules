@@ -1,84 +1,203 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:equatable/equatable.dart';
-import 'package:test_app/dio_adapter.dart';
-import 'package:test_app/http_error_handle.dart';
-import 'package:test_app/http_failures.dart';
+import 'package:provider/single_child_widget.dart';
+import 'package:provider/provider.dart';
+
+typedef Bind = List<SingleChildWidget>?;
+typedef Routers = Map<String, WidgetBuilder>;
+
+abstract class ModuleFactory {
+  final Routers _routers;
+  final Bind? _bindings;
+
+  ModuleFactory({Bind? bindings, required Routers routers})
+      : _routers = routers,
+        _bindings = bindings;
+
+  Routers get routers {
+    return _routers.map(
+      (key, pageBuilder) => MapEntry(
+        key,
+        (_) => MultiProvider(
+          providers: _bindings ?? [Provider(create: (_) => Object())],
+          child: Builder(builder: (context) => pageBuilder(context)),
+        ),
+      ),
+    );
+  }
+
+  Widget getPage(String path, BuildContext context) {
+    final widgetBuilder = _routers[path];
+    if (widgetBuilder != null) {
+      return MultiProvider(
+        builder: (context, child) => Builder(
+          builder: (context) => widgetBuilder(context),
+        ),
+        providers: _bindings ?? [Provider(create: (_) => Object())],
+      );
+    }
+    throw Exception();
+  }
+
+  void onModuleActivate() {}
+
+  void onModuleDeactivate() {}
+}
+
+class HomeModule extends ModuleFactory {
+  HomeModule()
+      : super(
+          routers: {
+            '/': (_) => Scaffold(
+                  appBar: AppBar(
+                    title: Text('First Module'),
+                  ),
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final navigator = Navigator.of(_);
+                        navigator.pushNamed('/second');
+                      },
+                      child: Text('Go to Second Module'),
+                    ),
+                  ),
+                ),
+            '/top': (_) => Scaffold(
+                  appBar: AppBar(
+                    title: Text('top'),
+                  ),
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final navigator = Navigator.of(_);
+                        navigator.pushNamed('/');
+                      },
+                      child: Text('Go to first Module'),
+                    ),
+                  ),
+                ),
+          },
+        );
+  @override
+  void onModuleActivate() {
+    print('Second module activated');
+  }
+
+  @override
+  void onModuleDeactivate() {
+    print('Second module deactivated');
+  }
+}
+
+class SecondModule extends ModuleFactory {
+  SecondModule()
+      : super(
+          routers: {
+            '/second': (_) => Scaffold(
+                  appBar: AppBar(
+                    title: Text('Second Module'),
+                  ),
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final navigator = Navigator.of(_);
+                        navigator.pushNamed('/top');
+                      },
+                      child: Text('Go to First Module'),
+                    ),
+                  ),
+                ),
+          },
+        );
+  @override
+  void onModuleActivate() {
+    print('Second module activated');
+  }
+
+  @override
+  void onModuleDeactivate() {
+    print('Second module deactivated');
+  }
+}
 
 void main() {
-  runApp(const MyApp());
-}
+  runApp(
+    MaterialApp(
+      title: 'Multi Module App',
+      initialRoute: '/',
+      onGenerateRoute: (RouteSettings settings) {
+        switch (settings.name) {
+          case '/':
+            return PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 500),
+              pageBuilder: (BuildContext context, Animation<double> animation,
+                  Animation<double> secondaryAnimation) {
+                return HomeModule().getPage('/', context);
+              },
+              transitionsBuilder: (BuildContext context,
+                  Animation<double> animation,
+                  Animation<double> secondaryAnimation,
+                  Widget child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                );
+              },
+            );
+          case '/top':
+            return PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 500),
+              pageBuilder: (BuildContext context, Animation<double> animation,
+                  Animation<double> secondaryAnimation) {
+                return HomeModule().getPage('/top', context);
+              },
+              transitionsBuilder: (BuildContext context,
+                  Animation<double> animation,
+                  Animation<double> secondaryAnimation,
+                  Widget child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                );
+              },
+            );
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+          case '/second':
+            return PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 500),
+              pageBuilder: (BuildContext context, Animation<double> animation,
+                  Animation<double> secondaryAnimation) {
+                return SecondModule().getPage('/second', context);
+              },
+              transitionsBuilder: (BuildContext context,
+                  Animation<double> animation,
+                  Animation<double> secondaryAnimation,
+                  Widget child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                );
+              },
+            );
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatelessWidget {
-  MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  final ValueNotifier<String> token = ValueNotifier('');
-
-  final client = DioHttpAdapter(dio: Dio());
-
-  Future<String> login() async {
-    try {
-      final data = await client.request(
-        url: 'https://jsonplaceholder.typicode.com/posts',
-        method: 'post',
-        body: {
-          "title": 'foo',
-          "body": 'bar',
-          "userId": 1,
-        },
-      );
-
-      return token.value = data.data.toString();
-    } on HttpFailures catch (err) {
-      final error = HttpFailureHandler.getFirstError(err);
-
-      return error;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
-      body: RefreshIndicator(
-        onRefresh: login,
-        child: SingleChildScrollView(
-            child: FutureBuilder<String>(
-                future: login(),
-                builder:
-                    (BuildContext context, AsyncSnapshot<String> snapshot) {
-                  if (snapshot.hasData) {
-                    return Text(snapshot.data!);
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else {
-                    return Center(child: CircularProgressIndicator());
-                  }
-                })),
-      ),
-      floatingActionButton:
-          FloatingActionButton(onPressed: login, child: Icon(Icons.add)),
-    );
-  }
+          default:
+            return MaterialPageRoute(
+              builder: (_) => Scaffold(
+                body: Center(
+                  child: Text('Route not found.'),
+                ),
+              ),
+            );
+        }
+      },
+    ),
+  );
 }
