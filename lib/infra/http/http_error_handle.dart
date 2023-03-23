@@ -1,4 +1,4 @@
-import 'package:test_app/http_failures.dart';
+import 'package:test_app/infra/http/http_failures.dart';
 
 class HttpFailureHandler {
   static dynamic getFirstError(HttpFailures err) {

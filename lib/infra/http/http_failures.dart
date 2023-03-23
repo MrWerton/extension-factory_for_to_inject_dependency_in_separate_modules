@@ -10,21 +10,21 @@ abstract class HttpFailures extends Equatable {
 }
 
 class BadRequestFailure extends HttpFailures {
-  BadRequestFailure(Map<String, dynamic> error) : super(error);
+  const BadRequestFailure(Map<String, dynamic> error) : super(error);
 }
 
 class UnauthorizedFailure extends HttpFailures {
-  UnauthorizedFailure(Map<String, dynamic> error) : super(error);
+  const UnauthorizedFailure(Map<String, dynamic> error) : super(error);
 }
 
 class NotFoundFailure extends HttpFailures {
-  NotFoundFailure(Map<String, dynamic> error) : super(error);
+  const NotFoundFailure(Map<String, dynamic> error) : super(error);
 }
 
 class ServerExeption extends HttpFailures {
-  ServerExeption(Map<String, dynamic> error) : super(error);
+  const ServerExeption(Map<String, dynamic> error) : super(error);
 }
 
 class DefaultFailures extends HttpFailures {
-  DefaultFailures(Map<String, dynamic> error) : super(error);
+  const DefaultFailures(Map<String, dynamic> error) : super(error);
 }
